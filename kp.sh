@@ -189,7 +189,7 @@ health_check() {
 	while true; do
 		for key in "${!systems_map[@]}"; do
 			if [[ ! -f "$CHECK_DIR/ping_$key" ]]; then
-                echo "PING $key"
+                # echo "PING $key" # TODO: think about
 				touch "$CHECK_DIR/ping_$key"
 			fi
 		done
