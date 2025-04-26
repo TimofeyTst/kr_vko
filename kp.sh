@@ -238,16 +238,16 @@ health_check() {
 				# Если система впервые перестала работать, выводим сообщение
 				if [[ ${service_status[$key]} -eq 1 ]]; then
 					check_time=$(date '+%d-%m %H:%M:%S.%3N')
-					echo "$check_time ${service_names[$key]} is NOT AVAILABLE"
-					echo "$check_time ${service_names[$key]} is NOT AVAILABLE" >>"$KP_LOG_PATH"
+					echo "$check_time ${services_map[$key]} is NOT AVAILABLE"
+					echo "$check_time ${services_map[$key]} is NOT AVAILABLE" >>"$KP_LOG_PATH"
 					service_status["$key"]=0 # Отмечаем как неработающую
 				fi
 			else
 				# Если система была неработающей, но теперь отвечает, выводим сообщение о восстановлении
 				if [[ ${service_status[$key]} -eq 0 ]]; then
 					check_time=$(date '+%d-%m %H:%M:%S.%3N')
-					echo "$check_time ${service_names[$key]} is AVAILABLE"
-					echo "$check_time ${service_names[$key]} is AVAILABLE" >>"$KP_LOG_PATH"
+					echo "$check_time ${services_map[$key]} is AVAILABLE"
+					echo "$check_time ${services_map[$key]} is AVAILABLE" >>"$KP_LOG_PATH"
 					service_status["$key"]=1 # Отмечаем как работающую
 				fi
 			fi

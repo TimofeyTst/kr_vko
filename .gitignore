@@ -1,6 +1,6 @@
-/db/*.db
+# /db/*.db
+# vkr.db
 /logs/*
 /messages/*
 /temp/*
 /bin/*
-vkr.db
