@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source internal.sh
+
 # ./zrdn.sh 1 9200000 4500000 2000000
 # Проверяем, переданы ли параметры
 if [[ $# -ne 4 ]]; then
@@ -95,11 +97,6 @@ check_and_process_ping() {
 		pong_file="$CHECK_DIR/pong_zrdn$ZRDN_NUM"
 		touch "$pong_file"
 	fi
-}
-
-# Функция вычисления расстояния (используем bc)
-distance() {
-	./math_modules/distance "$1" "$2" "$3" "$4"
 }
 
 # Функция для определения типа цели по скорости

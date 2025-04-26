@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source utils/const.sh
+
 cleanup() {
     echo "Остановка всех скриптов..."
     # Завершаем все дочерние процессы текущего скрипта
@@ -8,6 +10,15 @@ cleanup() {
 }
 
 trap cleanup SIGINT SIGTERM
+
+# Компиляция C файлов
+INTERNAL_DIR="./internal"
+echo "Компиляция C-файлов..."
+
+gcc -o "$BIN_DIR/distance" "$INTERNAL_DIR/distance.c" -lm
+gcc -o "$BIN_DIR/is_in_sector" "$INTERNAL_DIR/is_in_sector.c" -lm
+gcc -o "$BIN_DIR/is_trajectory_crossing_circle" "$INTERNAL_DIR/is_trajectory_crossing_circle.c" -lm
+echo "Компиляция C-файлов завершена"
 
 echo "Запуск всех скриптов..."
 

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source internal.sh
+
 # ./rls.sh 1 3200000 3000000 3500000 180 120 3150000 3750000 1200000
 # Проверяем, переданы ли параметры
 if [[ $# -ne 9 ]]; then
@@ -92,20 +94,6 @@ check_and_process_ping() {
 	fi
 }
 
-# Функция вычисления расстояния (используем bc)
-distance() {
-	./math_modules/distance "$1" "$2" "$3" "$4"
-}
-
-# Функция вычисления попадания между лучами (используем bc)
-beam() {
-	./math_modules/beam "$1" "$2" "$RLS_X" "$RLS_Y" "$RLS_ALPHA" "$RLS_ANGLE"
-}
-
-check_trajectory_intersection() {
-	./math_modules/check_trajectory_intersection "$1" "$2" "$3" "$4" "$SPRO_X" "$SPRO_Y" "$SPRO_RADIUS"
-}
-
 # Функция для определения типа цели по скорости
 get_target_type() {
 	local speed=$1
@@ -163,7 +151,7 @@ while true; do
 
 			dist_to_target=$(distance "$RLS_X" "$RLS_Y" "$x" "$y")
 			if (($(echo "$dist_to_target <= $RLS_RADIUS" | bc -l))); then
-				target_in_angle=$(beam "$x" "$y" "$RLS_ALPHA" "$RLS_ANGLE")
+				target_in_angle=$(is_in_sector "$x" "$y" "$RLS_ALPHA" "$RLS_ANGLE")
 				if [[ "$target_in_angle" -eq 1 ]]; then
 					if [[ -n "${TARGET_COORDS[$target_id]}" ]]; then
 						prev_x=$(echo "${TARGET_COORDS[$target_id]}" | cut -d',' -f1)
@@ -177,7 +165,7 @@ while true; do
 							detection_time=$(date '+%d-%m %H:%M:%S.%3N')
 							echo "$detection_time РЛС$RLS_NUM Обнаружена цель ID:$target_id с координатами X:$x Y:$y, скорость: $speed м/с ($target_type)"
 							echo "$detection_time РЛС$RLS_NUM Обнаружена цель ID:$target_id с координатами X:$x Y:$y, скорость: $speed м/с ${TARGET_TYPE[$target_id]}" >>"$RLS_LOG"
-							if [[ $(check_trajectory_intersection "$prev_x" "$prev_y" "$x" "$y") -eq 1 ]]; then
+							if [[ $(is_trajectory_crossing_circle "$prev_x" "$prev_y" "$x" "$y") -eq 1 ]]; then
 								echo "$detection_time РЛС$RLS_NUM Цель ID:$target_id движется в сторону СПРО"
 								encrypt_and_save_message "$DETECTIONS_DIR/" "$detection_time РЛС$RLS_NUM $target_id X:$x Y:$y $speed ББ БР-СПРО" &
 								echo "$detection_time РЛС$RLS_NUM Цель ID:$target_id движется в сторону СПРО" >>"$RLS_LOG"

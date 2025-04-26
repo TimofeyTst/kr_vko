@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source internal.sh
+
 # ./spro.sh 3150000 3750000 1200000
 # Проверяем, переданы ли параметры
 if [[ $# -ne 3 ]]; then
@@ -94,11 +96,6 @@ check_and_process_ping() {
 		pong_file="$CHECK_DIR/pong_spro"
 		touch "$pong_file"
 	fi
-}
-
-# Функция вычисления расстояния (используем bc)
-distance() {
-	./math_modules/distance "$1" "$2" "$3" "$4"
 }
 
 # Функция для определения типа цели по скорости
