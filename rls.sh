@@ -1,33 +1,20 @@
 #!/bin/bash
 
 source internal.sh
+source utils/const.sh
+source utils/common.sh
 
-# ./rls.sh 1 3200000 3000000 3500000 180 120 3150000 3750000 1200000
 # Проверяем, переданы ли параметры
 if [[ $# -ne 9 ]]; then
 	echo "Использование: $0 <Номер_РЛС> <X_координата> <Y_координата> <Радиус действия> <Азимут> <Угол обзора> <СПРО_X_координата> <СПРО_Y_координата> <СПРО Радиус действия>"
 	exit 1
 fi
 
-# Проверка на запуск от root
-if [[ $EUID -eq 0 ]]; then
-    echo "Ошибка: Запуск от root запрещен!"
-    exit 1
-fi
+[[ $EUID -eq 0 ]] && { echo "Запуск от root запрещен"; exit 1; }
+[[ "$(uname)" != "Linux" ]] && { echo "Скрипт поддерживается только в Linux"; exit 1; }
+[[ -z "$BASH_VERSION" ]] && { echo "Скрипт должен выполняться в Bash"; exit 1; }
 
-# Проверка ОС
-if [[ "$(uname)" != "Linux" ]]; then
-    echo "Ошибка: Скрипт поддерживается только в Linux!"
-    exit 1
-fi
-
-# Проверка оболочки
-if [[ -z "$BASH_VERSION" ]]; then
-    echo "Ошибка: Скрипт должен выполняться в Bash!"
-    exit 1
-fi
-
-RLS_NUM=$1
+RLS_ID=$1
 RLS_X=$2
 RLS_Y=$3
 RLS_RADIUS=$4
@@ -38,23 +25,15 @@ SPRO_X=$7
 SPRO_Y=$8
 SPRO_RADIUS=$9
 
-# Каталоги
-TARGETS_DIR="/tmp/GenTargets/Targets"
-
 # Путь к файлу с обработанными целями
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
-PROCESSED_FILES="$SCRIPT_DIR/temp/rls${RLS_NUM}_processed_files.txt"
+PROCESSED_FILES="$SCRIPT_DIR/temp/rls${RLS_ID}_processed_files.txt"
 >"$PROCESSED_FILES" # Очистка файла при запуске
 
 # Определяем папку для сообщений и логов
 MESSAGES_DIR="$SCRIPT_DIR/messages"
-RLS_LOG="$SCRIPT_DIR/logs/rls${RLS_NUM}_log.txt"
+RLS_LOG="$SCRIPT_DIR/logs/rls${RLS_ID}_log.log"
 >"$RLS_LOG" # Очистка файла при запуске
-
-DETECTIONS_DIR="$MESSAGES_DIR/detections"
-CHECK_DIR="$MESSAGES_DIR/check"
-mkdir -p "$DETECTIONS_DIR"
-mkdir -p "$CHECK_DIR"
 
 # Количество файлов для анализа
 MAX_FILES=50
@@ -63,33 +42,13 @@ MAX_FILES=50
 declare -A TARGET_COORDS
 declare -A TARGET_TYPE
 
-# Генерация случайного имени файла (20 символов) - для сообщений
-generate_random_filename() {
-	cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 20 | head -n 1
-}
-
-encrypt_and_save_message() {
-	local dir_path="$1"
-	local content="$2"
-
-	local filename="rls${RLS_NUM}$(generate_random_filename)"
-	local file_path="${dir_path}${filename}"
-
-	# Создаём контрольную сумму SHA-256
-	local checksum=$(echo -n "$content" | sha256sum | cut -d' ' -f1)
-	# Шифрование base64
-	local encrypted_content=$(echo -n "$content" | base64)
-
-	echo "$checksum $encrypted_content" >"$file_path"
-}
-
 # Проверка на существование
-check_and_process_ping() {
-	ping_file=$(find "$CHECK_DIR" -type f -name "ping_rls$RLS_NUM")
+process_ping() {
+	ping_file=$(find "$PING_DIR" -type f -name "ping_rls$RLS_ID")
 
 	if [[ -n "$ping_file" ]]; then
 		rm -f "$ping_file"
-		pong_file="$CHECK_DIR/pong_rls$RLS_NUM"
+		pong_file="$PING_DIR/pong_rls$RLS_ID"
 		touch "$pong_file"
 	fi
 }
@@ -106,26 +65,16 @@ get_target_type() {
 	fi
 }
 
-# Функция для декодирования ID цели из имени файла
-decode_target_id() {
-	local filename=$1
-	local decoded_hex=""
-	for ((i = 2; i <= ${#filename}; i += 4)); do
-		decoded_hex+="${filename:$i:2}"
-	done
-	echo -n "$decoded_hex" | xxd -r -p
-}
-
-echo "РЛС${RLS_NUM} запущена!"
+echo "РЛС${RLS_ID} запущена!"
 
 cleanup() {
-	echo -e "\nРЛС$RLS_NUM остановлена!"
+	echo -e "\nРЛС$RLS_ID остановлена!"
 	exit 0
 }
 
 trap cleanup SIGINT SIGTERM
 
-find "$MESSAGES_DIR" -type f -name "rls${RLS_NUM}*" -exec rm -f {} \;
+find "$MESSAGES_DIR" -type f -name "rls${RLS_ID}*" -exec rm -f {} \;
 while true; do
 	# Получаем последние MAX_FILES файлов, отсортированные по времени
 	mapfile -t latest_files < <(find "$TARGETS_DIR" -type f -printf "%T@ %p\n" 2>/dev/null | sort -nr | head -n "$MAX_FILES" | cut -d' ' -f2-)
@@ -137,7 +86,7 @@ while true; do
 			continue
 		fi
 
-		if [[ ${#filename} -le 2 ]]; then
+		if [[ ${#filename} -le 2 ]]; then # Если файл битый (после уничтожения)
 			echo "$filename" >>"$PROCESSED_FILES"
 			continue
 		fi
@@ -163,14 +112,14 @@ while true; do
 
 						if [[ $target_type == "ББ БР" ]]; then
 							detection_time=$(date '+%d-%m %H:%M:%S.%3N')
-							echo "$detection_time РЛС$RLS_NUM Обнаружена цель ID:$target_id с координатами X:$x Y:$y, скорость: $speed м/с ($target_type)"
-							echo "$detection_time РЛС$RLS_NUM Обнаружена цель ID:$target_id с координатами X:$x Y:$y, скорость: $speed м/с ${TARGET_TYPE[$target_id]}" >>"$RLS_LOG"
+							echo "$detection_time РЛС$RLS_ID Обнаружена цель ID:$target_id с координатами X:$x Y:$y, скорость: $speed м/с ($target_type)"
+							echo "$detection_time РЛС$RLS_ID Обнаружена цель ID:$target_id с координатами X:$x Y:$y, скорость: $speed м/с ${TARGET_TYPE[$target_id]}" >>"$RLS_LOG"
 							if [[ $(is_trajectory_crossing_circle "$prev_x" "$prev_y" "$x" "$y") -eq 1 ]]; then
-								echo "$detection_time РЛС$RLS_NUM Цель ID:$target_id движется в сторону СПРО"
-								encrypt_and_save_message "$DETECTIONS_DIR/" "$detection_time РЛС$RLS_NUM $target_id X:$x Y:$y $speed ББ БР-СПРО" &
-								echo "$detection_time РЛС$RLS_NUM Цель ID:$target_id движется в сторону СПРО" >>"$RLS_LOG"
+								echo "$detection_time РЛС$RLS_ID Цель ID:$target_id движется в сторону СПРО"
+								encrypt_and_save_message "$DETECTIONS_DIR/" "$detection_time РЛС$RLS_ID $target_id X:$x Y:$y $speed ББ БР-СПРО" &
+								echo "$detection_time РЛС$RLS_ID Цель ID:$target_id движется в сторону СПРО" >>"$RLS_LOG"
 							else
-								encrypt_and_save_message "$DETECTIONS_DIR/" "$detection_time РЛС$RLS_NUM $target_id X:$x Y:$y $speed ББ БР" &
+								encrypt_and_save_message "$DETECTIONS_DIR/" "$detection_time РЛС$RLS_ID $target_id X:$x Y:$y $speed ББ БР" &
 							fi
 						fi
 					fi
@@ -180,7 +129,7 @@ while true; do
 		fi
 	done
 
-	check_and_process_ping &
+	process_ping &
 	total_lines=$(wc -l <"$RLS_LOG")
 	if ((total_lines > 100)); then
 		temp_file=$(mktemp) # Временный файл

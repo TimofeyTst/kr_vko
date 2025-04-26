@@ -1,6 +1,8 @@
 #!/bin/bash
 
 source internal.sh
+source utils/const.sh
+source utils/common.sh
 
 # ./spro.sh 3150000 3750000 1200000
 # Проверяем, переданы ли параметры
@@ -31,28 +33,14 @@ SPRO_X=$1
 SPRO_Y=$2
 SPRO_RADIUS=$3
 
-# Каталоги
-TARGETS_DIR="/tmp/GenTargets/Targets"
-DESTROY_DIR="/tmp/GenTargets/Destroy"
-
 # Путь к файлу с обработанными целями
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PROCESSED_FILES="$SCRIPT_DIR/temp/spro_processed_files.txt"
 >"$PROCESSED_FILES" # Очистка файла при запуске
 
 # Определяем папку для сообщений и логов
-MESSAGES_DIR="$SCRIPT_DIR/messages"
 SPRO_LOG="$SCRIPT_DIR/logs/spro_log.txt"
 >"$SPRO_LOG" # Очистка файла при запуске
-
-DETECTIONS_DIR="$MESSAGES_DIR/detections"
-SHOOTING_DIR="$MESSAGES_DIR/shooting"
-CHECK_DIR="$MESSAGES_DIR/check"
-AMMO_DIR="$MESSAGES_DIR/ammo"
-mkdir -p "$DETECTIONS_DIR"
-mkdir -p "$SHOOTING_DIR"
-mkdir -p "$CHECK_DIR"
-mkdir -p "$AMMO_DIR"
 
 # Боезапас и время пополнения
 MISSILES=10
@@ -67,33 +55,13 @@ declare -A TARGET_COORDS
 declare -A TARGET_TYPE
 declare -A TARGET_SHOT_TIME
 
-# Генерация случайного имени файла (20 символов) - для сообщений
-generate_random_filename() {
-	cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 20 | head -n 1
-}
-
-encrypt_and_save_message() {
-    local dir_path="$1"
-    local content="$2"
-
-    local filename="spro$(generate_random_filename)"
-    local file_path="${dir_path}${filename}"
-
-    # Создаём контрольную сумму SHA-256
-    local checksum=$(echo -n "$content" | sha256sum | cut -d' ' -f1)
-    # Шифрование base64
-    local encrypted_content=$(echo -n "$content" | base64)
-
-    echo "$checksum $encrypted_content" > "$file_path"
-}
-
 # Проверка на существование
-check_and_process_ping() {
-	ping_file=$(find "$CHECK_DIR" -type f -name "ping_spro")
+process_ping() {
+	ping_file=$(find "$PING_DIR" -type f -name "ping_spro")
 
 	if [[ -n "$ping_file" ]]; then
 		rm -f "$ping_file"
-		pong_file="$CHECK_DIR/pong_spro"
+		pong_file="$PING_DIR/pong_spro"
 		touch "$pong_file"
 	fi
 }
@@ -108,16 +76,6 @@ get_target_type() {
 	else
 		echo "Самолет"
 	fi
-}
-
-# Функция для декодирования ID цели из имени файла
-decode_target_id() {
-	local filename=$1
-	local decoded_hex=""
-	for ((i = 2; i <= ${#filename}; i += 4)); do
-		decoded_hex+="${filename:$i:2}"
-	done
-	echo -n "$decoded_hex" | xxd -r -p
 }
 
 echo "СПРО запущена!"
@@ -245,7 +203,7 @@ while true; do
 		fi
 	done
 
-	check_and_process_ping &
+	process_ping &
 	total_lines=$(wc -l < "$SPRO_LOG")
 	if (( total_lines > 100 )); then
 		temp_file=$(mktemp)  # Временный файл

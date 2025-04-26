@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source utils/const.sh
+
 # Проверка условий запуска
 [[ $EUID -eq 0 ]] && { echo "Запуск от root запрещен!"; exit 1; }
 [[ "$(uname)" != "Linux" ]] && { echo "Скрипт поддерживается только в Linux!"; exit 1; }
@@ -8,18 +10,9 @@
 ROOT_DIR=$(dirname "$(realpath "$0")")
 DB_PATH="$ROOT_DIR/db/vkr.db"
 
-MESSAGES_DIR="$ROOT_DIR/messages"
-DETECTIONS_DIR="$MESSAGES_DIR/detections"
-SHOOTING_DIR="$MESSAGES_DIR/shooting"
-AMMO_DIR="$MESSAGES_DIR/ammo"
-CHECK_DIR="$MESSAGES_DIR/check"
-
 # Определяем папку для логов
 KP_LOG_PATH="$ROOT_DIR/logs/kp.log"
 >"$KP_LOG_PATH" # Очистка файла при запуске
-
-# Создание необходимых директорий
-mkdir -p "$MESSAGES_DIR" "$DETECTIONS_DIR" "$SHOOTING_DIR" "$AMMO_DIR" "$CHECK_DIR" &>/dev/null
 
 # Создание базы данных и таблиц, если они не существуют
 init_database() {
@@ -188,16 +181,16 @@ done
 health_check() {
 	while true; do
 		for key in "${!systems_map[@]}"; do
-			if [[ ! -f "$CHECK_DIR/ping_$key" ]]; then
+			if [[ ! -f "$PING_DIR/ping_$key" ]]; then
                 # echo "PING $key" # TODO: think about
-				touch "$CHECK_DIR/ping_$key"
+				touch "$PING_DIR/ping_$key"
 			fi
 		done
 
 		sleep 30
 
 		for key in "${!systems_map[@]}"; do
-			if [[ -f "$CHECK_DIR/ping_$key" ]]; then
+			if [[ -f "$PING_DIR/ping_$key" ]]; then
 				# Если система впервые перестала работать, выводим сообщение
 				if [[ ${system_status[$key]} -eq 1 ]]; then
 					check_time=$(date '+%d-%m %H:%M:%S.%3N')
@@ -214,7 +207,7 @@ health_check() {
 					system_status["$key"]=1 # Отмечаем как работающую
 				fi
 			fi
-			rm -f "$CHECK_DIR/pong_$key"
+			rm -f "$PING_DIR/pong_$key"
 		done
 
 		sleep 30
