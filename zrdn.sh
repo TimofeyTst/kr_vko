@@ -11,36 +11,22 @@ if [[ $# -ne 4 ]]; then
 	exit 1
 fi
 
-# Проверка на запуск от root
-if [[ $EUID -eq 0 ]]; then
-    echo "Ошибка: Запуск от root запрещен!"
-    exit 1
-fi
+[[ $EUID -eq 0 ]] && { echo "Запуск от root запрещен"; exit 1; }
+[[ "$(uname)" != "Linux" ]] && { echo "Скрипт поддерживается только в Linux"; exit 1; }
+[[ -z "$BASH_VERSION" ]] && { echo "Скрипт должен выполняться в Bash"; exit 1; }
 
-# Проверка ОС
-if [[ "$(uname)" != "Linux" ]]; then
-    echo "Ошибка: Скрипт поддерживается только в Linux!"
-    exit 1
-fi
-
-# Проверка оболочки
-if [[ -z "$BASH_VERSION" ]]; then
-    echo "Ошибка: Скрипт должен выполняться в Bash!"
-    exit 1
-fi
-
-ZRDN_NUM=$1
+ZRDN_ID=$1
 ZRDN_X=$2
 ZRDN_Y=$3
 ZRDN_RADIUS=$4
 
 # Путь к файлу с обработанными целями
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
-PROCESSED_FILES="$SCRIPT_DIR/temp/zrdn${ZRDN_NUM}_processed_files.txt"
+PROCESSED_FILES="$SCRIPT_DIR/temp/zrdn${ZRDN_ID}_processed_files.txt"
 >"$PROCESSED_FILES" # Очистка файла при запуске
 
 # Определяем папку для сообщений и логов
-ZRDN_LOG="$SCRIPT_DIR/logs/zrdn${ZRDN_NUM}_log.txt"
+ZRDN_LOG="$SCRIPT_DIR/logs/zrdn${ZRDN_ID}_log.txt"
 >"$ZRDN_LOG" # Очистка файла при запуске
 
 # Боезапас и время пополнения
@@ -48,47 +34,21 @@ MISSILES=20
 RELOAD_TIME=10     # Время до пополнения (в секундах)
 LAST_RELOAD_TIME=0 # Временная метка последней перезарядки
 
-# Количество файлов для анализа
-MAX_FILES=50
-
 # Ассоциативные массивы
 declare -A TARGET_COORDS
 declare -A TARGET_TYPE
 declare -A TARGET_SHOT_TIME
 
-process_ping() {
-	ping_file=$(find "$PING_DIR" -type f -name "ping_zrdn$ZRDN_NUM")
+echo "ЗРДН${ZRDN_ID} запущена!"
 
-	if [[ -n "$ping_file" ]]; then
-		rm -f "$ping_file"
-		pong_file="$PING_DIR/pong_zrdn$ZRDN_NUM"
-		touch "$pong_file"
-	fi
-}
-
-# Функция для определения типа цели по скорости
-get_target_type() {
-	local speed=$1
-	if (($(echo "$speed >= 8000" | bc -l))); then
-		echo "ББ БР"
-	elif (($(echo "$speed >= 250" | bc -l))); then
-		echo "Крылатая ракета"
-	else
-		echo "Самолет"
-	fi
-}
-
-echo "ЗРДН${ZRDN_NUM} запущена!"
-
-cleanup() {
-	echo -e "\nЗРДН$ZRDN_NUM остановлена!"
+defer() {
+	echo -e "\nЗРДН$ZRDN_ID остановлена!"
 	exit 0
 }
 
-trap cleanup SIGINT SIGTERM
+trap defer SIGINT SIGTERM
 
-find "$MESSAGES_DIR" -type f -name "zrdn${ZRDN_NUM}*" -exec rm -f {} \;
-encrypt_and_save_message "$AMMO_DIR/" "$(date '+%d-%m %H:%M:%S.%3N') ЗРДН$ZRDN_NUM $MISSILES" &
+encrypt_and_save_message "$AMMO_DIR/" "$(date '+%d-%m %H:%M:%S.%3N') ЗРДН$ZRDN_ID $MISSILES" &
 while true; do
 	current_time=$(date +%s)
 
@@ -97,9 +57,9 @@ while true; do
 		MISSILES=20
 		LAST_RELOAD_TIME=$current_time
 		ammo_time=$(date '+%d-%m %H:%M:%S.%3N')
-		echo "$ammo_time ЗРДН$ZRDN_NUM Боезапас пополнен - $MISSILES снарядов"
-		encrypt_and_save_message "$AMMO_DIR/" "$ammo_time ЗРДН$ZRDN_NUM $MISSILES" &
-		echo "$ammo_time ЗРДН$ZRDN_NUM Боезапас пополнен - $MISSILES снарядов" >>"$ZRDN_LOG"
+		echo "$ammo_time ЗРДН$ZRDN_ID Боезапас пополнен - $MISSILES снарядов"
+		encrypt_and_save_message "$AMMO_DIR/" "$ammo_time ЗРДН$ZRDN_ID $MISSILES" &
+		echo "$ammo_time ЗРДН$ZRDN_ID Боезапас пополнен - $MISSILES снарядов" >>"$ZRDN_LOG"
 	fi
 
 	unset FIRST_TARGET_FILE
@@ -135,9 +95,9 @@ while true; do
 
 			if [[ ("${TARGET_TYPE[$target_id]}" == "Крылатая ракета" || "${TARGET_TYPE[$target_id]}" == "Самолет") && -n "${TARGET_SHOT_TIME[$target_id]}" ]]; then
 				miss_time=$(date '+%d-%m %H:%M:%S.%3N')
-				echo "$miss_time ЗРДН$ZRDN_NUM Промах по цели ID:$target_id при выстреле в ${TARGET_SHOT_TIME[$target_id]}"
-				encrypt_and_save_message "$SHOOTING_DIR/" "${TARGET_SHOT_TIME[$target_id]} ЗРДН$ZRDN_NUM $target_id $miss_time 0" &
-				echo "$miss_time ЗРДН$ZRDN_NUM Промах по цели ID:$target_id при выстреле в ${TARGET_SHOT_TIME[$target_id]}" >>"$ZRDN_LOG"
+				echo "$miss_time ЗРДН$ZRDN_ID Промах по цели ID:$target_id при выстреле в ${TARGET_SHOT_TIME[$target_id]}"
+				encrypt_and_save_message "$SHOOTING_DIR/" "${TARGET_SHOT_TIME[$target_id]} ЗРДН$ZRDN_ID $target_id $miss_time 0" &
+				echo "$miss_time ЗРДН$ZRDN_ID Промах по цели ID:$target_id при выстреле в ${TARGET_SHOT_TIME[$target_id]}" >>"$ZRDN_LOG"
 				unset TARGET_SHOT_TIME["$target_id"]
 			fi
 
@@ -157,9 +117,9 @@ while true; do
 
 						if [[ "${TARGET_TYPE[$target_id]}" == "Крылатая ракета" || "${TARGET_TYPE[$target_id]}" == "Самолет" ]]; then
 							detection_time=$(date '+%d-%m %H:%M:%S.%3N')
-							echo "$detection_time ЗРДН$ZRDN_NUM Обнаружена цель ID:$target_id с координатами X:$x Y:$y, скорость: $speed м/с ($target_type)"
-							encrypt_and_save_message "$DETECTIONS_DIR/" "$detection_time ЗРДН$ZRDN_NUM $target_id X:$x Y:$y $speed ${TARGET_TYPE[$target_id]}" &
-							echo "$detection_time ЗРДН$ZRDN_NUM Обнаружена цель ID:$target_id с координатами X:$x Y:$y, скорость: $speed м/с ${TARGET_TYPE[$target_id]}" >>"$ZRDN_LOG"
+							echo "$detection_time ЗРДН$ZRDN_ID Обнаружена цель ID:$target_id с координатами X:$x Y:$y, скорость: $speed м/с ($target_type)"
+							encrypt_and_save_message "$DETECTIONS_DIR/" "$detection_time ЗРДН$ZRDN_ID $target_id X:$x Y:$y $speed ${TARGET_TYPE[$target_id]}" &
+							echo "$detection_time ЗРДН$ZRDN_ID Обнаружена цель ID:$target_id с координатами X:$x Y:$y, скорость: $speed м/с ${TARGET_TYPE[$target_id]}" >>"$ZRDN_LOG"
 						fi
 					fi
 
@@ -167,18 +127,18 @@ while true; do
 						if ((MISSILES > 0)); then
 							((MISSILES--))
 							shot_time=$(date '+%d-%m %H:%M:%S.%3N')
-							echo "$shot_time ЗРДН$ZRDN_NUM Выстрел по цели ID:$target_id. Осталось снарядов: $MISSILES"
-							encrypt_and_save_message "$SHOOTING_DIR/" "$shot_time ЗРДН$ZRDN_NUM $target_id" &
-							echo "$shot_time ЗРДН$ZRDN_NUM Выстрел по цели ID:$target_id. Осталось снарядов: $MISSILES" >>"$ZRDN_LOG"
-							echo "ЗРДН$ZRDN_NUM" >"$DESTROY_DIR/$target_id"
+							echo "$shot_time ЗРДН$ZRDN_ID Выстрел по цели ID:$target_id. Осталось снарядов: $MISSILES"
+							encrypt_and_save_message "$SHOOTING_DIR/" "$shot_time ЗРДН$ZRDN_ID $target_id" &
+							echo "$shot_time ЗРДН$ZRDN_ID Выстрел по цели ID:$target_id. Осталось снарядов: $MISSILES" >>"$ZRDN_LOG"
+							echo "ЗРДН$ZRDN_ID" >"$DESTROY_DIR/$target_id"
 							TARGET_SHOT_TIME["$target_id"]="$shot_time"
 
 							if ((MISSILES == 0)); then
 								LAST_RELOAD_TIME=$(date +%s)
-								echo "$(date '+%d-%m %H:%M:%S.%3N') ЗРДН$ZRDN_NUM Боезапас исчерпан! Начинается перезарядка"
+								echo "$(date '+%d-%m %H:%M:%S.%3N') ЗРДН$ZRDN_ID Боезапас исчерпан! Начинается перезарядка"
 							fi
 						else
-							echo "$(date '+%d-%m %H:%M:%S.%3N') ЗРДН$ZRDN_NUM Невозможно атаковать цель ID:$target_id - Боезапас исчерпан"
+							echo "$(date '+%d-%m %H:%M:%S.%3N') ЗРДН$ZRDN_ID Невозможно атаковать цель ID:$target_id - Боезапас исчерпан"
 						fi
 					fi
 				fi
@@ -195,15 +155,15 @@ while true; do
 		if [[ -z "${FIRST_TARGET_FILE[$id]}" ]]; then
 			if [[ ("${TARGET_TYPE[$id]}" == "Крылатая ракета" || "${TARGET_TYPE[$id]}" == "Самолет") && -n "${TARGET_SHOT_TIME[$id]}" ]]; then
 				destruction_time=$(date '+%d-%m %H:%M:%S.%3N')
-				echo "$destruction_time ЗРДН$ZRDN_NUM Уничтожена цель ID:$id при выстреле в ${TARGET_SHOT_TIME[$id]}"
-				encrypt_and_save_message "$SHOOTING_DIR/" "${TARGET_SHOT_TIME[$id]} ЗРДН$ZRDN_NUM $id $destruction_time 1" &
-				echo "$destruction_time ЗРДН$ZRDN_NUM Уничтожена цель ID:$id при выстреле в ${TARGET_SHOT_TIME[$id]}" >>"$ZRDN_LOG"
+				echo "$destruction_time ЗРДН$ZRDN_ID Уничтожена цель ID:$id при выстреле в ${TARGET_SHOT_TIME[$id]}"
+				encrypt_and_save_message "$SHOOTING_DIR/" "${TARGET_SHOT_TIME[$id]} ЗРДН$ZRDN_ID $id $destruction_time 1" &
+				echo "$destruction_time ЗРДН$ZRDN_ID Уничтожена цель ID:$id при выстреле в ${TARGET_SHOT_TIME[$id]}" >>"$ZRDN_LOG"
 				unset TARGET_SHOT_TIME["$id"]
 			fi
 		fi
 	done
 
-	process_ping &
+	process_ping "zrdn$ZRDN_ID" &
 	total_lines=$(wc -l <"$ZRDN_LOG")
 	if ((total_lines > 100)); then
 		temp_file=$(mktemp) # Временный файл

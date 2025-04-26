@@ -11,23 +11,9 @@ if [[ $# -ne 3 ]]; then
     exit 1
 fi
 
-# Проверка на запуск от root
-if [[ $EUID -eq 0 ]]; then
-    echo "Ошибка: Запуск от root запрещен!"
-    exit 1
-fi
-
-# Проверка ОС
-if [[ "$(uname)" != "Linux" ]]; then
-    echo "Ошибка: Скрипт поддерживается только в Linux!"
-    exit 1
-fi
-
-# Проверка оболочки
-if [[ -z "$BASH_VERSION" ]]; then
-    echo "Ошибка: Скрипт должен выполняться в Bash!"
-    exit 1
-fi
+[[ $EUID -eq 0 ]] && { echo "Запуск от root запрещен"; exit 1; }
+[[ "$(uname)" != "Linux" ]] && { echo "Скрипт поддерживается только в Linux"; exit 1; }
+[[ -z "$BASH_VERSION" ]] && { echo "Скрипт должен выполняться в Bash"; exit 1; }
 
 SPRO_X=$1
 SPRO_Y=$2
@@ -47,47 +33,20 @@ MISSILES=10
 RELOAD_TIME=20     # Время до пополнения (в секундах)
 LAST_RELOAD_TIME=0 # Временная метка последней перезарядки
 
-# Количество файлов для анализа
-MAX_FILES=50
-
 # Ассоциативные массивы
 declare -A TARGET_COORDS
 declare -A TARGET_TYPE
 declare -A TARGET_SHOT_TIME
 
-# Проверка на существование
-process_ping() {
-	ping_file=$(find "$PING_DIR" -type f -name "ping_spro")
-
-	if [[ -n "$ping_file" ]]; then
-		rm -f "$ping_file"
-		pong_file="$PING_DIR/pong_spro"
-		touch "$pong_file"
-	fi
-}
-
-# Функция для определения типа цели по скорости
-get_target_type() {
-	local speed=$1
-	if (($(echo "$speed >= 8000" | bc -l))); then
-		echo "ББ БР"
-	elif (($(echo "$speed >= 250" | bc -l))); then
-		echo "Крылатая ракета"
-	else
-		echo "Самолет"
-	fi
-}
-
 echo "СПРО запущена!"
 
-cleanup() {
+defer() {
     echo -e "\nСПРО остановлена!"
     exit 0
 }
 
-trap cleanup SIGINT SIGTERM
+trap defer SIGINT SIGTERM
 
-find "$MESSAGES_DIR" -type f -name "spro*" -exec rm -f {} \;
 encrypt_and_save_message "$AMMO_DIR/" "$(date '+%d-%m %H:%M:%S.%3N') СПРО $MISSILES" &
 while true; do
 	current_time=$(date +%s)
@@ -203,7 +162,7 @@ while true; do
 		fi
 	done
 
-	process_ping &
+	process_ping "spro" &
 	total_lines=$(wc -l < "$SPRO_LOG")
 	if (( total_lines > 100 )); then
 		temp_file=$(mktemp)  # Временный файл

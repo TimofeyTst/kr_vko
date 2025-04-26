@@ -2,14 +2,14 @@
 
 source utils/const.sh
 
-cleanup() {
+defer() {
     echo "Остановка всех скриптов..."
     # Завершаем все дочерние процессы текущего скрипта
     pkill -P $$  # Убивает все процессы, запущенные этим скриптом
     exit 0
 }
 
-trap cleanup SIGINT SIGTERM
+trap defer SIGINT SIGTERM
 
 # Компиляция C файлов
 INTERNAL_DIR="./internal"
@@ -21,6 +21,7 @@ gcc -o "$BIN_DIR/is_trajectory_crossing_circle" "$INTERNAL_DIR/is_trajectory_cro
 echo "Компиляция C-файлов завершена"
 
 echo "Запуск всех скриптов..."
+find "$MESSAGES_DIR" -type f -name "*" -exec rm -f {} \;
 
 ./rls.sh 1 2500000 6500000 6000000 90 90 3250000 5250000 1400000 &
 ./rls.sh 2 12000000 5000000 3500000 90 120 3250000 5250000 1400000 &

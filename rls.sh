@@ -35,46 +35,19 @@ MESSAGES_DIR="$SCRIPT_DIR/messages"
 RLS_LOG="$SCRIPT_DIR/logs/rls${RLS_ID}_log.log"
 >"$RLS_LOG" # Очистка файла при запуске
 
-# Количество файлов для анализа
-MAX_FILES=50
-
 # Ассоциативные массивы
 declare -A TARGET_COORDS
 declare -A TARGET_TYPE
 
-# Проверка на существование
-process_ping() {
-	ping_file=$(find "$PING_DIR" -type f -name "ping_rls$RLS_ID")
+echo "РЛС${RLS_ID} запущена"
 
-	if [[ -n "$ping_file" ]]; then
-		rm -f "$ping_file"
-		pong_file="$PING_DIR/pong_rls$RLS_ID"
-		touch "$pong_file"
-	fi
-}
-
-# Функция для определения типа цели по скорости
-get_target_type() {
-	local speed=$1
-	if (($(echo "$speed >= 8000" | bc -l))); then
-		echo "ББ БР"
-	elif (($(echo "$speed >= 250" | bc -l))); then
-		echo "Крылатая ракета"
-	else
-		echo "Самолет"
-	fi
-}
-
-echo "РЛС${RLS_ID} запущена!"
-
-cleanup() {
-	echo -e "\nРЛС$RLS_ID остановлена!"
+defer() {
+	echo -e "\РЛС$RLS_ID остановлена"
 	exit 0
 }
 
-trap cleanup SIGINT SIGTERM
+trap defer SIGINT SIGTERM
 
-find "$MESSAGES_DIR" -type f -name "rls${RLS_ID}*" -exec rm -f {} \;
 while true; do
 	# Получаем последние MAX_FILES файлов, отсортированные по времени
 	mapfile -t latest_files < <(find "$TARGETS_DIR" -type f -printf "%T@ %p\n" 2>/dev/null | sort -nr | head -n "$MAX_FILES" | cut -d' ' -f2-)
@@ -129,7 +102,7 @@ while true; do
 		fi
 	done
 
-	process_ping &
+	process_ping "rls$RLS_ID" &
 	total_lines=$(wc -l <"$RLS_LOG")
 	if ((total_lines > 100)); then
 		temp_file=$(mktemp) # Временный файл

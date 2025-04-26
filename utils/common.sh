@@ -1,5 +1,18 @@
 #!/bin/bash
 
+# Ping
+process_ping() {
+    local service_id="$1"
+
+    ping_file=$(find "$PING_DIR" -type f -name "ping_${service_id}")
+
+    if [[ -n "$ping_file" ]]; then
+        rm -f "$ping_file"
+        pong_file="$PING_DIR/pong_${service_id}"
+        touch "$pong_file"
+    fi
+}
+
 # Декодирование ID цели из имени файла
 decode_target_id() {
 	local filename=$1
@@ -30,3 +43,31 @@ encrypt_and_save_message() {
     echo "$checksum $encrypted_content" >"$file_path"
 }
 
+# Target type
+get_target_type() {
+    local speed=$1
+    if (( $(echo "$speed >= 8000 && $speed <= 10000" | bc -l) )); then
+		echo "ББ БР"
+    elif (( $(echo "$speed >= 250 && $speed < 8000" | bc -l) )); then
+        if (( $(echo "$speed <= 1000" | bc -l) )); then
+            echo "Крылатая ракета"
+        else
+            echo "Неизвестный тип"
+        fi
+    elif (( $(echo "$speed >= 50 && $speed < 250" | bc -l) )); then
+        echo "Самолет"
+    else
+        echo "Неизвестный тип"
+    fi
+}
+
+# old_get_target_type() {
+# 	local speed=$1
+# 	if (($(echo "$speed >= 8000" | bc -l))); then
+# 		echo "ББ БР"
+# 	elif (($(echo "$speed >= 250" | bc -l))); then
+# 		echo "Крылатая ракета"
+# 	else
+# 		echo "Самолет"
+# 	fi
+# }

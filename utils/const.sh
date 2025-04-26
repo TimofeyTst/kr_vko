@@ -13,7 +13,10 @@ MESSAGES_DIR="$ROOT_DIR/messages"
 mkdir -p "$MESSAGES_DIR" &>/dev/null
 
 DETECTIONS_DIR="$MESSAGES_DIR/detections"
-SHOOTING_DIR="$MESSAGES_DIR/shooting"
-PING_DIR="$MESSAGES_DIR/check"
+SHOOTING_DIR="$MESSAGES_DIR/shots"
+PING_DIR="$MESSAGES_DIR/ping"
 AMMO_DIR="$MESSAGES_DIR/ammo"
 mkdir -p "$DETECTIONS_DIR" "$SHOOTING_DIR" "$PING_DIR" "$AMMO_DIR" &>/dev/null
+
+# Количество файлов для анализа
+MAX_FILES=50
