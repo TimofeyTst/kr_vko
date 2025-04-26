@@ -1,6 +1,6 @@
-КОЛИЧЕСТВО ПОПАДАНИЙ И ПРОМАХОВ ПО КАЖДОЙ СТАНЦИИ (ЕСЛИ БЫЛ ХОТЯ БЫ ОДИН ВЫСТРЕЛ)
+-- КОЛИЧЕСТВО ПОПАДАНИЙ И ПРОМАХОВ ПО КАЖДОЙ СТАНЦИИ (ЕСЛИ БЫЛ ХОТЯ БЫ ОДИН ВЫСТРЕЛ)
 
-sqlite3 vko.db <<EOF
+sqlite3 vkr.db <<EOF
 .headers on
 .mode table
 SELECT 
@@ -14,9 +14,9 @@ GROUP BY s.name;
 EOF
 
 
-ТОП СТАНЦИЙ ПО КОЛИЧЕСТВУ УНИЧТОЖЕНИЙ
+-- ТОП СТАНЦИЙ ПО КОЛИЧЕСТВУ УНИЧТОЖЕНИЙ
 
-sqlite3 vko.db <<EOF
+sqlite3 vkr.db <<EOF
 .headers on
 .mode table
 SELECT 
@@ -29,9 +29,9 @@ GROUP BY s.name
 ORDER BY total_hits DESC;
 EOF
 
-ТОП СТАНЦИЙ ПО МЕТКОСТИ (ПРОЦЕНТУ УНИЧТОЖЕНИЙ СРЕДИ ВСЕХ ВЫСТРЕЛОВ)
+-- ТОП СТАНЦИЙ ПО МЕТКОСТИ (ПРОЦЕНТУ УНИЧТОЖЕНИЙ СРЕДИ ВСЕХ ВЫСТРЕЛОВ)
 
-sqlite3 vko.db <<EOF
+sqlite3 vkr.db <<EOF
 .headers on
 .mode table
 SELECT 
@@ -45,9 +45,9 @@ GROUP BY s.name
 ORDER BY hit_percentage DESC;
 EOF
 
-КОЛИЧЕСТВО БП У КАЖДОЙ СТАНЦИИ
+-- КОЛИЧЕСТВО БП У КАЖДОЙ СТАНЦИИ
 
-sqlite3 vko.db <<EOF
+sqlite3 vkr.db <<EOF
 .headers on
 .mode table
 WITH last_ammo AS (
@@ -72,9 +72,9 @@ LEFT JOIN shooting sh
 GROUP BY s.name, la.last_count;
 EOF
 
-КОЛИЧЕСТВО СБИТЫХ ЦЕЛЕЙ У КАЖДОЙ СТАНЦИИ ЗРДН ЗА ИНТЕРВАЛ ВРЕМЕНИ
+-- КОЛИЧЕСТВО СБИТЫХ ЦЕЛЕЙ У КАЖДОЙ СТАНЦИИ ЗРДН ЗА ИНТЕРВАЛ ВРЕМЕНИ
 
-sqlite3 vko.db <<EOF
+sqlite3 vkr.db <<EOF
 .headers on
 .mode table
 SELECT 
@@ -89,12 +89,12 @@ GROUP BY s.name
 ORDER BY total_hits DESC;
 EOF
 
-КОЛИЧЕСТВО ЦЕЛЕЙ, НАПРАВЛЯЮЩИХСЯ В СТОРОНУ СПРО
+-- КОЛИЧЕСТВО ЦЕЛЕЙ, НАПРАВЛЯЮЩИХСЯ В СТОРОНУ СПРО
 
-sqlite3 vko.db <<EOF
+sqlite3 vkr.db <<EOF
 .headers on
 .mode table
-SELECT COUNT(DISTINCT id) AS targets_moving_towards_PRO
+SELECT COUNT(DISTINCT id) AS targets_moving_towards_PRO, id
 FROM targets
 WHERE direction = 1;
 EOF

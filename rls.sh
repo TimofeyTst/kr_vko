@@ -179,7 +179,7 @@ while true; do
 							echo "$detection_time РЛС$RLS_NUM Обнаружена цель ID:$target_id с координатами X:$x Y:$y, скорость: $speed м/с ${TARGET_TYPE[$target_id]}" >>"$RLS_LOG"
 							if [[ $(check_trajectory_intersection "$prev_x" "$prev_y" "$x" "$y") -eq 1 ]]; then
 								echo "$detection_time РЛС$RLS_NUM Цель ID:$target_id движется в сторону СПРО"
-								encrypt_and_save_message "$DETECTIONS_DIR/" "$detection_time РЛС$RLS_NUM $target_id X:$x Y:$y $speed ББ БР-1" &
+								encrypt_and_save_message "$DETECTIONS_DIR/" "$detection_time РЛС$RLS_NUM $target_id X:$x Y:$y $speed ББ БР-СПРО" &
 								echo "$detection_time РЛС$RLS_NUM Цель ID:$target_id движется в сторону СПРО" >>"$RLS_LOG"
 							else
 								encrypt_and_save_message "$DETECTIONS_DIR/" "$detection_time РЛС$RLS_NUM $target_id X:$x Y:$y $speed ББ БР" &

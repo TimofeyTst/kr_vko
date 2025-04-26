@@ -113,7 +113,7 @@ handle_detection() {
 
 	echo "$ts $time $system_id $target_id $x $y $speed $target_type"
 
-	if [[ "$target_type" == "ББ БР-1" ]]; then
+	if [[ "$target_type" == "ББ БР-СПРО" ]]; then
 		dir=1;
 		target_type="ББ БР"
     	echo "$ts $time $system_id Обнаружена цель ID:$target_id X:$x Y:$y V:$speed м/с $target_type" >>"$KP_LOG_PATH"
