@@ -66,10 +66,10 @@ SELECT
     (la.last_count - COUNT(sh.id)) AS remaining_ammo
 FROM last_ammo la
 JOIN systems s ON la.system_id = s.id
-LEFT JOIN shooting sh 
+LEFT JOIN shooting sh
     ON la.system_id = sh.system_id 
     AND sh.timestamp > la.last_timestamp
-GROUP BY s.name, la.last_count;
+GROUP BY s.name;
 EOF
 
 -- КОЛИЧЕСТВО СБИТЫХ ЦЕЛЕЙ У КАЖДОЙ СТАНЦИИ ЗРДН ЗА ИНТЕРВАЛ ВРЕМЕНИ

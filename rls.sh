@@ -25,6 +25,8 @@ SPRO_X=$7
 SPRO_Y=$8
 SPRO_RADIUS=$9
 
+SERVICE_ID="РЛС$RLS_ID"
+
 # Путь к файлу с обработанными целями
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PROCESSED_FILES="$SCRIPT_DIR/temp/rls${RLS_ID}_processed_files.txt"
@@ -39,10 +41,10 @@ RLS_LOG="$SCRIPT_DIR/logs/rls${RLS_ID}_log.log"
 declare -A TARGET_COORDS
 declare -A TARGET_TYPE
 
-echo "РЛС${RLS_ID} запущена"
+echo "$SERVICE_ID запущена"
 
 defer() {
-	echo -e "\РЛС$RLS_ID остановлена"
+	echo -e "\n$SERVICE_ID остановлена"
 	exit 0
 }
 
@@ -50,31 +52,28 @@ trap defer SIGINT SIGTERM
 
 while true; do
 	# Получаем последние MAX_FILES файлов, отсортированные по времени
-	mapfile -t latest_files < <(find "$TARGETS_DIR" -type f -printf "%T@ %p\n" 2>/dev/null | sort -nr | head -n "$MAX_FILES" | cut -d' ' -f2-)
+	mapfile -t latest_files < <(ls -lt "$TARGETS_DIR" 2>/dev/null | head -n "$MAX_FILES" | awk '{print $9}')
 
 	for target_file in "${latest_files[@]}"; do
-		filename=$(basename "$target_file")
-
-		if grep -qFx "$filename" "$PROCESSED_FILES"; then
+		if grep -qFx "$target_file" "$PROCESSED_FILES"; then
 			continue
 		fi
 
-		if [[ ${#filename} -le 2 ]]; then # Если файл битый (после уничтожения)
-			echo "$filename" >>"$PROCESSED_FILES"
+		if [[ ${#target_file} -le 2 ]]; then # Если файл битый (после уничтожения)
+			echo "$target_file" >>"$PROCESSED_FILES"
 			continue
 		fi
 
-		target_id=$(decode_target_id "$filename")
-		echo "$filename" >>"$PROCESSED_FILES"
+		target_id=$(decode_target_id "$target_file")
+		echo "$target_file" >>"$PROCESSED_FILES"
 
 		# Если цель уже известного типа, пропустить
 		if [[ -n "${TARGET_TYPE[$target_id]}" ]]; then
 			continue
 		fi
 
-
-		x=$(grep -oP 'X:\s*\K\d+' "$target_file")
-		y=$(grep -oP 'Y:\s*\K\d+' "$target_file")
+		x=$(grep -oP 'X:\s*\K\d+' "$TARGETS_DIR/$target_file")
+		y=$(grep -oP 'Y:\s*\K\d+' "$TARGETS_DIR/$target_file")
 
 		# Пропустить цель, если она находится вне радиуса РЛС
 		dist_to_target=$(distance "$RLS_X" "$RLS_Y" "$x" "$y")
@@ -98,14 +97,14 @@ while true; do
 
 			if [[ $target_type == "ББ БР" ]]; then
 				detection_time=$(date '+%d-%m %H:%M:%S.%3N')
-				echo "$detection_time РЛС$RLS_ID Обнаружена цель ID:$target_id с координатами X:$x Y:$y, скорость: $speed м/с ($target_type)"
-				echo "$detection_time РЛС$RLS_ID Обнаружена цель ID:$target_id с координатами X:$x Y:$y, скорость: $speed м/с ${TARGET_TYPE[$target_id]}" >>"$RLS_LOG"
 				if [[ $(is_trajectory_crossing_circle "$prev_x" "$prev_y" "$x" "$y") -eq 1 ]]; then
-					echo "$detection_time РЛС$RLS_ID Цель ID:$target_id движется в сторону СПРО"
-					encrypt_and_save_message "$DETECTIONS_DIR/" "$detection_time РЛС$RLS_ID $target_id X:$x Y:$y $speed ББ БР-СПРО" &
-					echo "$detection_time РЛС$RLS_ID Цель ID:$target_id движется в сторону СПРО" >>"$RLS_LOG"
+					echo "$detection_time $SERVICE_ID Обнаружена цель ID:$target_id с координатами X:$x Y:$y, скорость: $speed м/с ($target_type) движется в сторону СПРО"
+					encrypt_and_save_message "$DETECTIONS_DIR/" "$detection_time $SERVICE_ID $target_id X:$x Y:$y $speed ББ БР->СПРО" &
+					echo "$detection_time $SERVICE_ID Обнаружена цель ID:$target_id с координатами X:$x Y:$y, скорость: $speed м/с ($target_type) движется в сторону СПРО" >>"$RLS_LOG"
 				else
-					encrypt_and_save_message "$DETECTIONS_DIR/" "$detection_time РЛС$RLS_ID $target_id X:$x Y:$y $speed ББ БР" &
+					echo "$detection_time $SERVICE_ID Обнаружена цель ID:$target_id с координатами X:$x Y:$y, скорость: $speed м/с ($target_type)"
+					encrypt_and_save_message "$DETECTIONS_DIR/" "$detection_time $SERVICE_ID $target_id X:$x Y:$y $speed ББ БР" &
+					echo "$detection_time $SERVICE_ID Обнаружена цель ID:$target_id с координатами X:$x Y:$y, скорость: $speed м/с ${TARGET_TYPE[$target_id]}" >>"$RLS_LOG"
 				fi
 			fi
 		fi

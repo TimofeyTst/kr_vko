@@ -97,22 +97,23 @@ upsert_system_id() {
 }
 
 # Обработка обнаружений (расшифрованные данные)
-handle_detection() {
+handle_detect() {
     local msg="$1" file="$2"
     read -r ts time system_id target_id x_line y_line speed target_type <<<"$msg"
     local x=${x_line#*:}
     local y=${y_line#*:}
     local dir="NULL"
 
-	echo "$ts $time $system_id $target_id $x $y $speed $target_type"
+	echo -e "$ts $time\t$system_id\tDETECT\t$target_id\t$x $y $speed\t$target_type"
 
-	if [[ "$target_type" == "ББ БР-СПРО" ]]; then
+	if [[ "$target_type" == "ББ БР->СПРО" ]]; then
 		dir=1;
 		target_type="ББ БР"
-    	echo "$ts $time $system_id Обнаружена цель ID:$target_id X:$x Y:$y V:$speed м/с $target_type" >>"$KP_LOG_PATH"
-		echo "$ts $time $system_id Цель ID:$target_id движется к СПРО" >>"$KP_LOG_PATH"
+    	echo -e "$ts $time\t$system_id\tОбнаружена цель ID:$target_id\tX:$x\tY:$y\tV:$speed м/с\t$target_type движется к СПРО" >>"$KP_LOG_PATH"
+    	# echo -e "$ts $time\t$system_id\tОбнаружена цель ID:$target_id\tX:$x\tY:$y\tV:$speed м/с\t$target_type движется к СПРО"
 	else
-    	echo "$ts $time $system_id Обнаружена цель ID:$target_id X:$x Y:$y V:$speed м/с $target_type" >>"$KP_LOG_PATH"
+    	echo -e "$ts $time\t$system_id\tОбнаружена цель ID:$target_id\tX:$x\tY:$y\tV:$speed м/с\t$target_type" >>"$KP_LOG_PATH"
+    	# echo -e "$ts $time\t$system_id\tОбнаружена цель ID:$target_id\tX:$x\tY:$y\tV:$speed м/с\t$target_type"
 	fi
 
     sqlite3 "$DB_PATH" "INSERT OR IGNORE INTO targets (id, speed, ttype, direction) VALUES ('$target_id', $speed, '$target_type', $dir);"
@@ -124,21 +125,23 @@ handle_detection() {
 }
 
 # Обработка файла стрельбы
-handle_shooting() {
+handle_shot() {
     local msg="$1" file="$2"
     read -r ts time system_id target_id result_ts result_time result <<<"$msg"
 
-	echo "$ts $time $system_id $target_id $result_ts $result_time $result"
+	echo -e "$ts $time\t$system_id\tSHOT\t$target_id\t$result_ts $result_time\t$result"
 
     local sys_id=$(upsert_system_id "$system_id")
     if [[ -z "$result_ts" ]]; then
         sqlite3 "$DB_PATH" "INSERT INTO shooting (target_id, system_id, timestamp) VALUES ('$target_id', $sys_id, '$ts $time');"
         ((ammo[$system_id]--))
-        echo "$ts $time $system_id Выстрел по ID:$target_id. Боезапас: ${ammo[$system_id]}" >>"$KP_LOG_PATH"
+        echo -e "$ts $time\t$system_id\tВыстрел по ID:$target_id\tБоезапас: ${ammo[$system_id]}" >>"$KP_LOG_PATH"
+        # echo -e "$ts $time\t$system_id\tВыстрел по ID:$target_id\tБоезапас: ${ammo[$system_id]}"
     else
         local last_id=$(sqlite3 "$DB_PATH" "SELECT id FROM shooting WHERE target_id='$target_id' AND system_id=$sys_id AND timestamp='$ts $time' ORDER BY id DESC LIMIT 1;")
         sqlite3 "$DB_PATH" "UPDATE shooting SET result=$result, result_timestamp='$result_ts $result_time' WHERE id=$last_id;"
-        echo "$ts $time $system_id $([[ $result == 1 ]] && echo 'Уничтожена цель' || echo 'Промах') по ID:$target_id при выстреле в $result_ts $result_time " >>"$KP_LOG_PATH"
+        echo -e "$ts $time\t$system_id\t$([[ $result == 1 ]] && echo 'Попадание' || echo 'Промах') по ID:$target_id при выстреле в $result_ts $result_time" >>"$KP_LOG_PATH"
+        # echo -e "$ts $time\t$system_id\t$([[ $result == 1 ]] && echo 'Попадание' || echo 'Промах') по ID:$target_id при выстреле в $result_ts $result_time"
     fi
 
     rm -f "$file"
@@ -153,8 +156,8 @@ handle_ammo() {
     
 	ammo["$system_id"]=$count
 
-	echo "$ts $time $system_id $count"
-	echo "$ts $time $system_id Боезапас обновлен. Загружено $count снарядов" >>"$KP_LOG_PATH"
+	echo -e "$ts $time\t$system_id\tAMMO\t$count"
+	echo -e "$ts $time\t$system_id\tБоезапас пополнен на $count снарядов" >>"$KP_LOG_PATH"
 
 	local sys_id=$(upsert_system_id "$system_id")
     sqlite3 "$DB_PATH" "INSERT INTO ammo (system_id, count, timestamp) VALUES ($sys_id, $count, '$ts $time');"
@@ -225,9 +228,9 @@ while true; do
 		decrypted_message=$(verify_and_decrypt "$file") || continue
 
 		if [[ "$file" == "$DETECTIONS_DIR/"* ]]; then
-			handle_detection "$decrypted_message" "$file"
+			handle_detect "$decrypted_message" "$file"
 		elif [[ "$file" == "$SHOOTING_DIR/"* ]]; then
-			handle_shooting "$decrypted_message" "$file"
+			handle_shot "$decrypted_message" "$file"
 		elif [[ "$file" == "$AMMO_DIR/"* ]]; then
 			handle_ammo "$decrypted_message" "$file"
 		fi
