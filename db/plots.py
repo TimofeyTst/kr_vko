@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import os
 
-DB_PATH = os.path.join('..', 'db', 'vkr.db')
+DB_PATH = os.path.join('vkr.db')
 
 def fetch_detections():
     """Извлекаем данные обнаружения из базы данных."""
@@ -18,7 +18,7 @@ def fetch_detections():
         return cursor.fetchall()
 
 def render_detection_map():
-    """Отображает карту обнаружений."""
+    """Отображает карту обнаружений с фоном map.jpg."""
     detections = fetch_detections()
 
     if not detections:
@@ -27,36 +27,43 @@ def render_detection_map():
 
     fig, ax = plt.subplots(figsize=(14, 10))
 
-    # ZRDN
+    # ФОН КАРТЫ
+    background_path = os.path.join('map.jpg')
+    if os.path.exists(background_path):
+        img = plt.imread(background_path)
+        ax.imshow(img, extent=[0, 13000000, 0, 9000000], aspect='auto', zorder=0)
+    else:
+        print(f"Фон {background_path} не найден, продолжаю без него.")
+
     zrdn = [
-        {'center': (5050000, 3750000), 'radius': 600000, 'color': "#5fba7d"}, # green
-        {'center': (2900000, 3500000), 'radius': 400000, 'color': "#5fba7d"}, 
-        {'center': (2600000, 6100000), 'radius': 550000, 'color': "#5fba7d"}
+        {'center': (5050000, 5300000), 'radius': 600000, 'color': "#5fba7d"}, # green
+        {'center': (2900000, 5750000), 'radius': 400000, 'color': "#5fba7d"}, 
+        {'center': (2600000, 2750000), 'radius': 550000, 'color': "#5fba7d"}
     ]
     
     spro = [
-        {'center': (3250000, 5250000), 'radius': 1400000, 'color': "#e57373"}
+        {'center': (3250000, 3750000), 'radius': 1400000, 'color': "#e57373"}
     ]
 
     for zone in zrdn:
-        circle = plt.Circle(zone['center'], zone['radius'], color=zone['color'], alpha=0.4, label='ЗРДН')
+        circle = plt.Circle(zone['center'], zone['radius'], color=zone['color'], alpha=0.4, label='ЗРДН', zorder=1)
         ax.add_patch(circle)
     
     for zone in spro:
-        circle = plt.Circle(zone['center'], zone['radius'], color=zone['color'], alpha=0.4, label='СПРО')
+        circle = plt.Circle(zone['center'], zone['radius'], color=zone['color'], alpha=0.4, label='СПРО', zorder=1)
         ax.add_patch(circle)
 
     # Секторы обзора
     rls = [
-        {'center': (2500000, 6500000), 'radius': 6000000, 'direction': 90, 'angle': 90, 'color': "#42a5f5"}, # blue
+        {'center': (2500000, 3600000), 'radius': 6000000, 'direction': 90, 'angle': 90, 'color': "#42a5f5"}, # blue
         {'center': (12000000, 5000000), 'radius': 3500000, 'direction': 90, 'angle': 120, 'color': "#42a5f5"},
-        {'center': (3900000, 5250000), 'radius': 4000000, 'direction': 270, 'angle': 200, 'color': "#42a5f5"}
+        {'center': (4000000, 3800000), 'radius': 4000000, 'direction': 270, 'angle': 200, 'color': "#42a5f5"}
     ]
 
     for sector in rls:
         start_angle = sector['direction'] - sector['angle'] / 2
         end_angle = sector['direction'] + sector['angle'] / 2
-        wedge = patches.Wedge(sector['center'], sector['radius'], start_angle, end_angle, color=sector['color'], alpha=0.15, label='РЛС')
+        wedge = patches.Wedge(sector['center'], sector['radius'], start_angle, end_angle, color=sector['color'], alpha=0.15, label='РЛС', zorder=1)
         ax.add_patch(wedge)
 
     # Цветовые обозначения для различных типов целей
@@ -77,9 +84,9 @@ def render_detection_map():
     }
 
     for x, y, target_type, service_id in detections:
-        color = target_color_map.get(target_type, "grey") # по умолчанию серый
-        marker = markers_by_system.get(service_id, "x") # по умолчанию крестики
-        plt.scatter(x, y, c=color, marker=marker, edgecolor="black", alpha=0.8, s=60, label=target_type)
+        color = target_color_map.get(target_type, "grey")
+        marker = markers_by_system.get(service_id, "x") # крестики
+        plt.scatter(x, y, c=color, marker=marker, edgecolor="black", alpha=0.8, s=60, label=target_type, zorder=2)
 
     # Настройка границ и пользовательских меток
     plt.xlim(0, 13000000)
