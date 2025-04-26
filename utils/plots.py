@@ -10,10 +10,9 @@ def fetch_detections():
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
         query = """
-        SELECT d.x, d.y, t.ttype, s.name
+        SELECT d.x, d.y, t.target_type, d.service_id
         FROM detections d
         JOIN targets t ON d.target_id = t.id
-        JOIN systems s ON d.system_id = s.id
         """
         cursor.execute(query)
         return cursor.fetchall()
@@ -77,9 +76,9 @@ def render_detection_map():
         "РЛС3": "D",   # ромбы
     }
 
-    for x, y, target_type, system_name in detections:
+    for x, y, target_type, service_id in detections:
         color = target_color_map.get(target_type, "grey") # по умолчанию серый
-        marker = markers_by_system.get(system_name, "x") # по умолчанию крестики
+        marker = markers_by_system.get(service_id, "x") # по умолчанию крестики
         plt.scatter(x, y, c=color, marker=marker, edgecolor="black", alpha=0.8, s=60, label=target_type)
 
     # Настройка границ и пользовательских меток
@@ -101,6 +100,6 @@ def render_detection_map():
 
     plt.grid(True, linestyle="--", linewidth=0.6)
     plt.show()
-/home/timofeytst/tmp/kr_vko/utils
+
 if __name__ == "__main__":
     render_detection_map()

@@ -22,47 +22,92 @@ init_database() {
 	fi
 
 	sqlite3 "$DB_PATH" <<EOF
-    CREATE TABLE IF NOT EXISTS targets (
-        id TEXT PRIMARY KEY,
-        speed REAL,
-        ttype TEXT,
-        direction BOOLEAN
-    );
+	CREATE TABLE IF NOT EXISTS targets (
+		id TEXT PRIMARY KEY,
+		speed REAL,
+		target_type TEXT,
+		is_move_to_spro BOOLEAN,
+		create_ts TEXT DEFAULT (datetime('now')),
+		update_ts TEXT DEFAULT (datetime('now'))
+	);
 
-    CREATE TABLE IF NOT EXISTS systems (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT UNIQUE
-    );
+	CREATE TABLE IF NOT EXISTS services (
+		id TEXT PRIMARY KEY,
+		create_ts TEXT DEFAULT (datetime('now')),
+		update_ts TEXT DEFAULT (datetime('now'))
+	);
 
 	CREATE TABLE IF NOT EXISTS ammo (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        system_id INTEGER,
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		service_id TEXT NOT NULL,
 		count INTEGER,
-        timestamp TEXT,
-		FOREIGN KEY (system_id) REFERENCES systems (id)
-    );
+		timestamp TEXT,
+		create_ts TEXT DEFAULT (datetime('now')),
+		update_ts TEXT DEFAULT (datetime('now')),
+		FOREIGN KEY (service_id) REFERENCES services(id)
+	);
 
-    CREATE TABLE IF NOT EXISTS detections (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        target_id TEXT,
-        system_id INTEGER,
-		x INTEGER,
-		y INTEGER,
-        timestamp TEXT,
-        FOREIGN KEY (target_id) REFERENCES targets (id),
-        FOREIGN KEY (system_id) REFERENCES systems (id)
-    );
+	CREATE TABLE IF NOT EXISTS detections (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		target_id TEXT NOT NULL,
+		service_id TEXT NOT NULL,
+		x INTEGER NOT NULL,
+		y INTEGER NOT NULL,
+		timestamp TEXT NOT NULL,
+		create_ts TEXT DEFAULT (datetime('now')),
+		update_ts TEXT DEFAULT (datetime('now')),
+		FOREIGN KEY (target_id) REFERENCES targets(id),
+		FOREIGN KEY (service_id) REFERENCES services(id)
+	);
 
-    CREATE TABLE IF NOT EXISTS shooting (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        target_id TEXT,
-        system_id INTEGER,
-        timestamp TEXT,
-		result BOOLEAN,
-		result_timestamp TEXT,
-        FOREIGN KEY (target_id) REFERENCES targets (id),
-        FOREIGN KEY (system_id) REFERENCES systems (id)
-    );
+	CREATE TABLE IF NOT EXISTS shots (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		target_id TEXT NOT NULL,
+		service_id TEXT NOT NULL,
+		timestamp TEXT NOT NULL, -- момент выстрела
+		is_hit_target BOOLEAN,          -- NULL, 0 или 1
+		hit_target_ts TEXT,   -- время попадания/промаха
+		create_ts TEXT DEFAULT (datetime('now')),
+		update_ts TEXT DEFAULT (datetime('now')),
+		FOREIGN KEY (target_id) REFERENCES targets(id),
+		FOREIGN KEY (service_id) REFERENCES services(id)
+	);
+
+	CREATE TRIGGER IF NOT EXISTS trg_targets_update
+	AFTER UPDATE ON targets
+	FOR EACH ROW
+	BEGIN
+		UPDATE targets SET update_ts = datetime('now') WHERE id = OLD.id;
+	END;
+
+	CREATE TRIGGER IF NOT EXISTS trg_services_update
+	AFTER UPDATE ON services
+	FOR EACH ROW
+	BEGIN
+		UPDATE services SET update_ts = datetime('now') WHERE id = OLD.id;
+	END;
+
+	CREATE TRIGGER IF NOT EXISTS trg_ammo_update
+	AFTER UPDATE ON ammo
+	FOR EACH ROW
+	BEGIN
+		UPDATE ammo SET update_ts = datetime('now') WHERE id = OLD.id;
+	END;
+
+	CREATE TRIGGER IF NOT EXISTS trg_detections_update
+	AFTER UPDATE ON detections
+	FOR EACH ROW
+	BEGIN
+		UPDATE detections SET update_ts = datetime('now') WHERE id = OLD.id;
+	END;
+
+	CREATE TRIGGER IF NOT EXISTS trg_shots_update
+	AFTER UPDATE ON shots
+	FOR EACH ROW
+	BEGIN
+		UPDATE shots SET update_ts = datetime('now') WHERE id = OLD.id;
+	END;
+
 EOF
 }
 
@@ -83,43 +128,39 @@ verify_and_decrypt() {
     fi
 }
 
-# Получение system_id по имени (добавляет в базу, если ее нет)
-upsert_system_id() {
-    local name="$1"
-    local id
-    id=$(sqlite3 "$DB_PATH" "SELECT id FROM systems WHERE name='$name';")
+# Получение service_id по имени (добавляет в базу, если ее нет)
+upsert_service_id() {
+    local service_id="$1"
 
-    if [[ -z "$id" ]]; then
-        sqlite3 "$DB_PATH" "INSERT INTO systems (name) VALUES ('$name');"
-        id=$(sqlite3 "$DB_PATH" "SELECT id FROM systems WHERE name='$name';")
-    fi
-    echo "$id"
+    sqlite3 "$DB_PATH" "INSERT INTO services (id) VALUES ('$service_id') ON CONFLICT(id) DO UPDATE SET update_ts = datetime('now');"
+
+    echo "$service_id"
 }
 
 # Обработка обнаружений (расшифрованные данные)
 handle_detect() {
     local msg="$1" file="$2"
-    read -r ts time system_id target_id x_line y_line speed target_type <<<"$msg"
+    read -r ts time service_id target_id x_line y_line speed target_type <<<"$msg"
     local x=${x_line#*:}
     local y=${y_line#*:}
     local dir="NULL"
 
-	echo -e "$ts $time\t$system_id\tDETECT\t$target_id\t$x $y $speed\t$target_type"
+	echo -e "$ts $time\t$service_id\tDETECT\t$target_id\t$x $y $speed\t$target_type"
 
 	if [[ "$target_type" == "ББ БР->СПРО" ]]; then
 		dir=1;
 		target_type="ББ БР"
-    	echo -e "$ts $time\t$system_id\tОбнаружена цель ID:$target_id\tX:$x\tY:$y\tV:$speed м/с\t$target_type движется к СПРО" >>"$KP_LOG_PATH"
-    	# echo -e "$ts $time\t$system_id\tОбнаружена цель ID:$target_id\tX:$x\tY:$y\tV:$speed м/с\t$target_type движется к СПРО"
+    	echo -e "$ts $time\t$service_id\tОбнаружена цель ID:$target_id\tX:$x\tY:$y\tV:$speed м/с\t$target_type движется к СПРО" >>"$KP_LOG_PATH"
+    	# echo -e "$ts $time\t$service_id\tОбнаружена цель ID:$target_id\tX:$x\tY:$y\tV:$speed м/с\t$target_type движется к СПРО"
 	else
-    	echo -e "$ts $time\t$system_id\tОбнаружена цель ID:$target_id\tX:$x\tY:$y\tV:$speed м/с\t$target_type" >>"$KP_LOG_PATH"
-    	# echo -e "$ts $time\t$system_id\tОбнаружена цель ID:$target_id\tX:$x\tY:$y\tV:$speed м/с\t$target_type"
+    	echo -e "$ts $time\t$service_id\tОбнаружена цель ID:$target_id\tX:$x\tY:$y\tV:$speed м/с\t$target_type" >>"$KP_LOG_PATH"
+    	# echo -e "$ts $time\t$service_id\tОбнаружена цель ID:$target_id\tX:$x\tY:$y\tV:$speed м/с\t$target_type"
 	fi
 
-    sqlite3 "$DB_PATH" "INSERT OR IGNORE INTO targets (id, speed, ttype, direction) VALUES ('$target_id', $speed, '$target_type', $dir);"
+    sqlite3 "$DB_PATH" "INSERT OR IGNORE INTO targets (id, speed, target_type, is_move_to_spro) VALUES ('$target_id', $speed, '$target_type', $dir);"
 
-    local sys_id=$(upsert_system_id "$system_id")
-	sqlite3 "$DB_PATH" "INSERT INTO detections (target_id, system_id, x, y, timestamp) VALUES ('$target_id', $sys_id, $x, $y, '$timestamp');"
+    local serv_id=$(upsert_service_id "$service_id")
+	sqlite3 "$DB_PATH" "INSERT INTO detections (target_id, service_id, x, y, timestamp) VALUES ('$target_id', '$serv_id', $x, $y, '$timestamp');"
 
 	rm -f "$file"
 }
@@ -127,21 +168,21 @@ handle_detect() {
 # Обработка файла стрельбы
 handle_shot() {
     local msg="$1" file="$2"
-    read -r ts time system_id target_id result_ts result_time result <<<"$msg"
+    read -r ts time service_id target_id result_ts result_time is_hit_target <<<"$msg"
 
-	echo -e "$ts $time\t$system_id\tSHOT\t$target_id\t$result_ts $result_time\t$result"
+	echo -e "$ts $time\t$service_id\tSHOT\t$target_id\t$result_ts $result_time\t$is_hit_target"
 
-    local sys_id=$(upsert_system_id "$system_id")
+    local serv_id=$(upsert_service_id "$service_id")
     if [[ -z "$result_ts" ]]; then
-        sqlite3 "$DB_PATH" "INSERT INTO shooting (target_id, system_id, timestamp) VALUES ('$target_id', $sys_id, '$ts $time');"
-        ((ammo[$system_id]--))
-        echo -e "$ts $time\t$system_id\tВыстрел по ID:$target_id\tБоезапас: ${ammo[$system_id]}" >>"$KP_LOG_PATH"
-        # echo -e "$ts $time\t$system_id\tВыстрел по ID:$target_id\tБоезапас: ${ammo[$system_id]}"
+        sqlite3 "$DB_PATH" "INSERT INTO shots (target_id, service_id, timestamp) VALUES ('$target_id', '$serv_id', '$ts $time');"
+        ((ammo[$service_id]--))
+        echo -e "$ts $time\t$service_id\tВыстрел по ID:$target_id\tБоезапас: ${ammo[$service_id]}" >>"$KP_LOG_PATH"
+        # echo -e "$ts $time\t$service_id\tВыстрел по ID:$target_id\tБоезапас: ${ammo[$service_id]}"
     else
-        local last_id=$(sqlite3 "$DB_PATH" "SELECT id FROM shooting WHERE target_id='$target_id' AND system_id=$sys_id AND timestamp='$ts $time' ORDER BY id DESC LIMIT 1;")
-        sqlite3 "$DB_PATH" "UPDATE shooting SET result=$result, result_timestamp='$result_ts $result_time' WHERE id=$last_id;"
-        echo -e "$ts $time\t$system_id\t$([[ $result == 1 ]] && echo 'Попадание' || echo 'Промах') по ID:$target_id при выстреле в $result_ts $result_time" >>"$KP_LOG_PATH"
-        # echo -e "$ts $time\t$system_id\t$([[ $result == 1 ]] && echo 'Попадание' || echo 'Промах') по ID:$target_id при выстреле в $result_ts $result_time"
+        local last_id=$(sqlite3 "$DB_PATH" "SELECT id FROM shots WHERE target_id='$target_id' AND service_id='$serv_id' AND timestamp='$ts $time' ORDER BY id DESC LIMIT 1;")
+        sqlite3 "$DB_PATH" "UPDATE shots SET is_hit_target=$is_hit_target, hit_target_ts='$result_ts $result_time' WHERE id=$last_id;"
+        echo -e "$ts $time\t$service_id\t$([[ $is_hit_target == 1 ]] && echo 'Попадание' || echo 'Промах') по ID:$target_id при выстреле в $result_ts $result_time" >>"$KP_LOG_PATH"
+        # echo -e "$ts $time\t$service_id\t$([[ $is_hit_target == 1 ]] && echo 'Попадание' || echo 'Промах') по ID:$target_id при выстреле в $result_ts $result_time"
     fi
 
     rm -f "$file"
@@ -152,20 +193,20 @@ declare -A ammo
 # Пополение боекомплекта
 handle_ammo() {
     local msg="$1" file="$2"
-    read -r ts time system_id count <<<"$msg"
+    read -r ts time service_id count <<<"$msg"
     
-	ammo["$system_id"]=$count
+	ammo["$service_id"]=$count
 
-	echo -e "$ts $time\t$system_id\tAMMO\t$count"
-	echo -e "$ts $time\t$system_id\tБоезапас пополнен на $count снарядов" >>"$KP_LOG_PATH"
+	echo -e "$ts $time\t$service_id\tAMMO\t$count"
+	echo -e "$ts $time\t$service_id\tБоезапас пополнен на $count снарядов" >>"$KP_LOG_PATH"
 
-	local sys_id=$(upsert_system_id "$system_id")
-    sqlite3 "$DB_PATH" "INSERT INTO ammo (system_id, count, timestamp) VALUES ($sys_id, $count, '$ts $time');"
+	local serv_id=$(upsert_service_id "$service_id")
+    sqlite3 "$DB_PATH" "INSERT INTO ammo (service_id, count, timestamp) VALUES ('$serv_id', $count, '$ts $time');"
 
     rm -f "$file"
 }
 
-declare -A systems_map=(
+declare -A services_map=(
 	["zrdn1"]="ЗРДН1"
 	["zrdn2"]="ЗРДН2"
 	["zrdn3"]="ЗРДН3"
@@ -175,15 +216,15 @@ declare -A systems_map=(
 	["rls3"]="РЛС3"
 )
 
-declare -A system_status
+declare -A service_status
 
-for key in "${!systems_map[@]}"; do
-	system_status["$key"]=1 # 1 - работает
+for key in "${!services_map[@]}"; do
+	service_status["$key"]=1 # 1 - работает
 done
 
 health_check() {
 	while true; do
-		for key in "${!systems_map[@]}"; do
+		for key in "${!services_map[@]}"; do
 			if [[ ! -f "$PING_DIR/ping_$key" ]]; then
                 # echo "PING $key" # TODO: think about
 				touch "$PING_DIR/ping_$key"
@@ -192,22 +233,22 @@ health_check() {
 
 		sleep 30
 
-		for key in "${!systems_map[@]}"; do
+		for key in "${!services_map[@]}"; do
 			if [[ -f "$PING_DIR/ping_$key" ]]; then
 				# Если система впервые перестала работать, выводим сообщение
-				if [[ ${system_status[$key]} -eq 1 ]]; then
+				if [[ ${service_status[$key]} -eq 1 ]]; then
 					check_time=$(date '+%d-%m %H:%M:%S.%3N')
-					echo "$check_time ${system_names[$key]} is NOT AVAILABLE"
-					echo "$check_time ${system_names[$key]} is NOT AVAILABLE" >>"$KP_LOG_PATH"
-					system_status["$key"]=0 # Отмечаем как неработающую
+					echo "$check_time ${service_names[$key]} is NOT AVAILABLE"
+					echo "$check_time ${service_names[$key]} is NOT AVAILABLE" >>"$KP_LOG_PATH"
+					service_status["$key"]=0 # Отмечаем как неработающую
 				fi
 			else
 				# Если система была неработающей, но теперь отвечает, выводим сообщение о восстановлении
-				if [[ ${system_status[$key]} -eq 0 ]]; then
+				if [[ ${service_status[$key]} -eq 0 ]]; then
 					check_time=$(date '+%d-%m %H:%M:%S.%3N')
-					echo "$check_time ${system_names[$key]} is AVAILABLE"
-					echo "$check_time ${system_names[$key]} is AVAILABLE" >>"$KP_LOG_PATH"
-					system_status["$key"]=1 # Отмечаем как работающую
+					echo "$check_time ${service_names[$key]} is AVAILABLE"
+					echo "$check_time ${service_names[$key]} is AVAILABLE" >>"$KP_LOG_PATH"
+					service_status["$key"]=1 # Отмечаем как работающую
 				fi
 			fi
 			rm -f "$PING_DIR/pong_$key"
