@@ -164,10 +164,6 @@ while true; do
 	done
 
 	process_ping "zrdn$ZRDN_ID" &
-	total_lines=$(wc -l <"$ZRDN_LOG")
-	if ((total_lines > 100)); then
-		temp_file=$(mktemp) # Временный файл
-		tail -n 100 "$ZRDN_LOG" >"$temp_file"
-		mv "$temp_file" "$ZRDN_LOG"
-	fi
+
+	trim_log_file "$ZRDN_LOG"
 done

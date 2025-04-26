@@ -163,10 +163,6 @@ while true; do
 	done
 
 	process_ping "spro" &
-	total_lines=$(wc -l < "$SPRO_LOG")
-	if (( total_lines > 100 )); then
-		temp_file=$(mktemp)  # Временный файл
-		tail -n 100 "$SPRO_LOG" > "$temp_file"
-		mv "$temp_file" "$SPRO_LOG"
-	fi
+
+	trim_log_file "$SPRO_LOG"
 done

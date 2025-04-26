@@ -71,3 +71,16 @@ get_target_type() {
 # 		echo "Самолет"
 # 	fi
 # }
+
+# Logs
+trim_log_file() {
+    local log_file="$1"
+    local max_lines=100
+
+    total_lines=$(wc -l < "$log_file")
+    if (( total_lines > max_lines )); then
+        local temp_file=$(mktemp) # Временный файл
+        tail -n "$max_lines" "$log_file" > "$temp_file"
+        mv "$temp_file" "$log_file"
+    fi
+}

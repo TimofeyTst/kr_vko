@@ -67,47 +67,54 @@ while true; do
 		target_id=$(decode_target_id "$filename")
 		echo "$filename" >>"$PROCESSED_FILES"
 
-		if [[ -z "${TARGET_TYPE[$target_id]}" ]]; then
-			x=$(grep -oP 'X:\s*\K\d+' "$target_file")
-			y=$(grep -oP 'Y:\s*\K\d+' "$target_file")
+		# Если цель уже известного типа, пропустить
+		if [[ -n "${TARGET_TYPE[$target_id]}" ]]; then
+			continue
+		fi
 
-			dist_to_target=$(distance "$RLS_X" "$RLS_Y" "$x" "$y")
-			if (($(echo "$dist_to_target <= $RLS_RADIUS" | bc -l))); then
-				target_in_angle=$(is_in_sector "$x" "$y" "$RLS_ALPHA" "$RLS_ANGLE")
-				if [[ "$target_in_angle" -eq 1 ]]; then
-					if [[ -n "${TARGET_COORDS[$target_id]}" ]]; then
-						prev_x=$(echo "${TARGET_COORDS[$target_id]}" | cut -d',' -f1)
-						prev_y=$(echo "${TARGET_COORDS[$target_id]}" | cut -d',' -f2)
 
-						speed=$(distance "$prev_x" "$prev_y" "$x" "$y")
-						target_type=$(get_target_type "$speed")
-						TARGET_TYPE["$target_id"]="$target_type"
+		x=$(grep -oP 'X:\s*\K\d+' "$target_file")
+		y=$(grep -oP 'Y:\s*\K\d+' "$target_file")
 
-						if [[ $target_type == "ББ БР" ]]; then
-							detection_time=$(date '+%d-%m %H:%M:%S.%3N')
-							echo "$detection_time РЛС$RLS_ID Обнаружена цель ID:$target_id с координатами X:$x Y:$y, скорость: $speed м/с ($target_type)"
-							echo "$detection_time РЛС$RLS_ID Обнаружена цель ID:$target_id с координатами X:$x Y:$y, скорость: $speed м/с ${TARGET_TYPE[$target_id]}" >>"$RLS_LOG"
-							if [[ $(is_trajectory_crossing_circle "$prev_x" "$prev_y" "$x" "$y") -eq 1 ]]; then
-								echo "$detection_time РЛС$RLS_ID Цель ID:$target_id движется в сторону СПРО"
-								encrypt_and_save_message "$DETECTIONS_DIR/" "$detection_time РЛС$RLS_ID $target_id X:$x Y:$y $speed ББ БР-СПРО" &
-								echo "$detection_time РЛС$RLS_ID Цель ID:$target_id движется в сторону СПРО" >>"$RLS_LOG"
-							else
-								encrypt_and_save_message "$DETECTIONS_DIR/" "$detection_time РЛС$RLS_ID $target_id X:$x Y:$y $speed ББ БР" &
-							fi
-						fi
-					fi
-					TARGET_COORDS["$target_id"]="$x,$y"
+		# Пропустить цель, если она находится вне радиуса РЛС
+		dist_to_target=$(distance "$RLS_X" "$RLS_Y" "$x" "$y")
+		if (($(echo "$dist_to_target > $RLS_RADIUS" | bc -l))); then
+			continue
+		fi
+
+		# Проверка, находится ли цель в секторе
+		target_in_sector=$(is_in_sector "$x" "$y" "$RLS_ALPHA" "$RLS_ANGLE")
+		if [[ "$target_in_sector" -ne 1 ]]; then
+			continue
+		fi
+
+		if [[ -n "${TARGET_COORDS[$target_id]}" ]]; then
+			prev_x=$(echo "${TARGET_COORDS[$target_id]}" | cut -d',' -f1)
+			prev_y=$(echo "${TARGET_COORDS[$target_id]}" | cut -d',' -f2)
+
+			speed=$(distance "$prev_x" "$prev_y" "$x" "$y")
+			target_type=$(get_target_type "$speed")
+			TARGET_TYPE["$target_id"]="$target_type"
+
+			if [[ $target_type == "ББ БР" ]]; then
+				detection_time=$(date '+%d-%m %H:%M:%S.%3N')
+				echo "$detection_time РЛС$RLS_ID Обнаружена цель ID:$target_id с координатами X:$x Y:$y, скорость: $speed м/с ($target_type)"
+				echo "$detection_time РЛС$RLS_ID Обнаружена цель ID:$target_id с координатами X:$x Y:$y, скорость: $speed м/с ${TARGET_TYPE[$target_id]}" >>"$RLS_LOG"
+				if [[ $(is_trajectory_crossing_circle "$prev_x" "$prev_y" "$x" "$y") -eq 1 ]]; then
+					echo "$detection_time РЛС$RLS_ID Цель ID:$target_id движется в сторону СПРО"
+					encrypt_and_save_message "$DETECTIONS_DIR/" "$detection_time РЛС$RLS_ID $target_id X:$x Y:$y $speed ББ БР-СПРО" &
+					echo "$detection_time РЛС$RLS_ID Цель ID:$target_id движется в сторону СПРО" >>"$RLS_LOG"
+				else
+					encrypt_and_save_message "$DETECTIONS_DIR/" "$detection_time РЛС$RLS_ID $target_id X:$x Y:$y $speed ББ БР" &
 				fi
 			fi
 		fi
+		TARGET_COORDS["$target_id"]="$x,$y"
 	done
 
 	process_ping "rls$RLS_ID" &
-	total_lines=$(wc -l <"$RLS_LOG")
-	if ((total_lines > 100)); then
-		temp_file=$(mktemp) # Временный файл
-		tail -n 100 "$RLS_LOG" >"$temp_file"
-		mv "$temp_file" "$RLS_LOG"
-	fi
+
+	trim_log_file "$RLS_LOG"
+
 	sleep 0.01
 done
