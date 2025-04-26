@@ -34,7 +34,7 @@ PROCESSED_FILES="$SCRIPT_DIR/temp/rls${RLS_ID}_processed_files.txt"
 
 # Определяем папку для сообщений и логов
 MESSAGES_DIR="$SCRIPT_DIR/messages"
-RLS_LOG="$SCRIPT_DIR/logs/rls${RLS_ID}_log.log"
+RLS_LOG="$SCRIPT_DIR/logs/rls${RLS_ID}.log"
 >"$RLS_LOG" # Очистка файла при запуске
 
 # Ассоциативные массивы

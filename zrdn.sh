@@ -28,7 +28,7 @@ PROCESSED_FILES="$SCRIPT_DIR/temp/zrdn${ZRDN_ID}_processed_files.txt"
 >"$PROCESSED_FILES" # Очистка файла при запуске
 
 # Определяем папку для сообщений и логов
-ZRDN_LOG="$SCRIPT_DIR/logs/zrdn${ZRDN_ID}_log.txt"
+ZRDN_LOG="$SCRIPT_DIR/logs/zrdn${ZRDN_ID}.log"
 >"$ZRDN_LOG" # Очистка файла при запуске
 
 # Боезапас и время пополнения

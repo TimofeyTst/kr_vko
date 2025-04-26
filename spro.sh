@@ -27,7 +27,7 @@ PROCESSED_FILES="$SCRIPT_DIR/temp/spro_processed_files.txt"
 >"$PROCESSED_FILES" # Очистка файла при запуске
 
 # Определяем папку для сообщений и логов
-SPRO_LOG="$SCRIPT_DIR/logs/spro_log.txt"
+SPRO_LOG="$SCRIPT_DIR/logs/spro.log"
 >"$SPRO_LOG" # Очистка файла при запуске
 
 # Боезапас и время пополнения
