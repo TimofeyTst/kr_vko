@@ -106,7 +106,11 @@ def render_detection_map():
     plt.legend(by_labels.values(), by_labels.keys(), loc="lower right", frameon=False)
 
     plt.grid(True, linestyle="--", linewidth=0.6)
-    plt.show()
+    # plt.show()
+
+    # Вместо plt.show():
+    plt.savefig('detection_map.png', dpi=100)
+    print("Карта сохранена в detection_map.png")
 
 if __name__ == "__main__":
     render_detection_map()
