@@ -1,20 +1,4 @@
--- КОЛИЧЕСТВО ПОПАДАНИЙ И ПРОМАХОВ ПО КАЖДОЙ СТАНЦИИ (ЕСЛИ БЫЛ ХОТЯ БЫ ОДИН ВЫСТРЕЛ)
-
-sqlite3 vkr.db <<EOF
-.headers on
-.mode table
-SELECT
-    service_id,
-    COUNT(shots.id) AS total_shots,
-    SUM(CASE WHEN is_hit_target = 1 THEN 1 ELSE 0 END) AS hits,
-    SUM(CASE WHEN is_hit_target = 0 THEN 1 ELSE 0 END) AS misses
-FROM shots
-GROUP BY service_id
-HAVING COUNT(*) > 0;
-EOF
-
-
--- ТОП СТАНЦИЙ ПО КОЛИЧЕСТВУ УНИЧТОЖЕНИЙ
+-- Кто сбил больше всего целей
 sqlite3 vkr.db <<EOF
 .headers on
 .mode table
@@ -27,7 +11,7 @@ GROUP BY service_id
 ORDER BY hit_count DESC;
 EOF
 
--- ТОП СТАНЦИЙ ПО МЕТКОСТИ (ПРОЦЕНТУ УНИЧТОЖЕНИЙ СРЕДИ ВСЕХ ВЫСТРЕЛОВ)
+-- Самые меткие станции (по кол-ву попаданий)
 sqlite3 vkr.db <<EOF
 .headers on
 .mode table
@@ -41,7 +25,7 @@ GROUP BY service_id
 ORDER BY accuracy_percent DESC;
 EOF
 
--- КОЛИЧЕСТВО БП У КАЖДОЙ СТАНЦИИ
+-- Cколько оcталось БП
 sqlite3 vkr.db <<EOF
 .headers on
 .mode table
@@ -74,7 +58,7 @@ LEFT JOIN shots_count sc
 WHERE l.rn = 1;
 EOF
 
--- КОЛИЧЕСТВО СБИТЫХ ЦЕЛЕЙ У КАЖДОЙ СТАНЦИИ ЗРДН ЗА ИНТЕРВАЛ ВРЕМЕНИ
+-- Cколько зрдн сбило за интервал времени
 sqlite3 vkr.db <<EOF
 .headers on
 .mode table
@@ -89,7 +73,21 @@ GROUP BY service_id
 ORDER BY destroyed_targets DESC;
 EOF
 
--- КОЛИЧЕСТВО ЦЕЛЕЙ, НАПРАВЛЯЮЩИХСЯ В СТОРОНУ СПРО
+-- Попадания и промахи каждой системы с хотя бы 1 выстрелом
+sqlite3 vkr.db <<EOF
+.headers on
+.mode table
+SELECT
+    service_id,
+    COUNT(shots.id) AS total_shots,
+    SUM(CASE WHEN is_hit_target = 1 THEN 1 ELSE 0 END) AS hits,
+    SUM(CASE WHEN is_hit_target = 0 THEN 1 ELSE 0 END) AS misses
+FROM shots
+GROUP BY service_id
+HAVING COUNT(*) > 0;
+EOF
+
+-- Все видимые цели, направляемые в сторону СПРО
 sqlite3 vkr.db <<EOF
 .headers on
 .mode table
